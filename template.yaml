@@ -112,3 +112,4 @@ Outputs:
   LambdaFunctionArn:
     Description: "GreenCloud Lambda Function ARN"
     Value: !GetAtt GreenCloudFunction.Arn
+
