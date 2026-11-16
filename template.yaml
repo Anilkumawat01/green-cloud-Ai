@@ -1,0 +1,114 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  GreenCloud AI - Serverless Backend
+  AWS Lambda + Amazon DynamoDB + Amazon API Gateway for cloud carbon & cost optimization.
+
+Globals:
+  Function:
+    Timeout: 15
+    MemorySize: 256
+    Runtime: python3.11
+
+Resources:
+  ##############################################################################
+  # 1. Amazon API Gateway (HTTP API with automated CORS support)
+  ##############################################################################
+  GreenCloudHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+          - X-Requested-With
+        AllowOrigins:
+          - "*"
+        MaxAge: 600
+
+  ##############################################################################
+  # 2. AWS Lambda Function: Carbon & Cost Optimizer Engine
+  ##############################################################################
+  GreenCloudFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/
+      Handler: app.lambda_handler
+      Description: Calculates cloud carbon optimization metrics and logs runs to DynamoDB
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref OptimizationLogsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OptimizationLogsTable
+      Events:
+        Root:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref GreenCloudHttpApi
+            Path: /
+            Method: GET
+        Health:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref GreenCloudHttpApi
+            Path: /health
+            Method: GET
+        Regions:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref GreenCloudHttpApi
+            Path: /regions
+            Method: GET
+        Optimize:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref GreenCloudHttpApi
+            Path: /optimize
+            Method: POST
+        Logs:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref GreenCloudHttpApi
+            Path: /logs
+            Method: GET
+        Proxy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref GreenCloudHttpApi
+            Path: /{proxy+}
+            Method: ANY
+
+  ##############################################################################
+  # 3. Amazon DynamoDB Table: Optimization Run History
+  ##############################################################################
+  OptimizationLogsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      Tags:
+        - Key: Project
+          Value: GreenCloudAI
+        - Key: Hackathon
+          Value: Weekend-Challenge-No-Pipeline
+
+Outputs:
+  ApiEndpoint:
+    Description: "HTTP API Gateway URL (Paste into frontend NEXT_PUBLIC_API_URL)"
+    Value: !Sub "https://${GreenCloudHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  DynamoDbTableName:
+    Description: "DynamoDB Table Name"
+    Value: !Ref OptimizationLogsTable
+  LambdaFunctionArn:
+    Description: "GreenCloud Lambda Function ARN"
+    Value: !GetAtt GreenCloudFunction.Arn
